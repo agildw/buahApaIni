@@ -8,6 +8,8 @@ from bs4 import BeautifulSoup
 import cv2
 from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 import matplotlib.pyplot as plt
+import av
+
 
 # Fungsi untuk memuat model dengan caching
 @st.cache_resource
@@ -175,12 +177,14 @@ st.markdown(
 # Kelas untuk transformasi video dengan streamlit-webrtc
 class VideoTransformer(VideoTransformerBase):
     def __init__(self):
-        self.threshold = 0.95
+        self.threshold = 0.9
 
-    def transform(self, frame):
+    # def transform(self, frame):
+    def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
         bbox_x, bbox_y, bbox_w, bbox_h, area = find_largest_contour_bounding_box(img)
-        if bbox_x is not None and area > 5000:
+        # print(bbox_x, bbox_y, bbox_w, bbox_h, area)
+        if bbox_x is not None and  area > 3000:
             cropped_frame = img[bbox_y:bbox_y + bbox_h, bbox_x:bbox_x + bbox_w]
             result, confidence = process_frame(cropped_frame, self.threshold)
             if result and (result.lower() in buah or result.lower() in sayuran):
@@ -193,7 +197,8 @@ class VideoTransformer(VideoTransformerBase):
                 cv2.rectangle(img, (10, 30), (10 + text_width, 30 - text_height - baseline), color, thickness=cv2.FILLED)
                 cv2.putText(img, text, (10, 30 - baseline), font, font_scale, (0, 0, 0), thickness)
                 cv2.rectangle(img, (bbox_x, bbox_y), (bbox_x + bbox_w, bbox_y + bbox_h), (0, 255, 0), 2)
-        return img
+        return av.VideoFrame.from_ndarray(img, format="bgr24")
+        # return img
 
 def main():
     option = st.selectbox('Pilih metode input:', ('Unggah Gambar', 'Gunakan Kamera'))
@@ -222,7 +227,7 @@ def main():
             visualisasi(image_cv, fourier_image)
     
     elif option == 'Gunakan Kamera':
-        webrtc_streamer(key="sample", video_transformer_factory=VideoTransformer)
+        webrtc_streamer(key="sample", video_processor_factory=VideoTransformer)
 
 if __name__ == '__main__':
     main()
