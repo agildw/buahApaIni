@@ -6,6 +6,7 @@ from keras.models import load_model
 import requests
 from bs4 import BeautifulSoup
 import cv2
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 import matplotlib.pyplot as plt
 
 # Fungsi untuk memuat model dengan caching
@@ -71,7 +72,7 @@ def processed_img(image_pil):
     return res.capitalize()
 
 # Fungsi untuk memproses frame dari webcam dan membuat prediksi
-def process_frame(frame, threshold=0.95):  # Menambah threshold menjadi 0.95
+def process_frame(frame, threshold):  
     image_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)).resize((224, 224))
     img = img_to_array(image_pil)
     img = img / 255.0
@@ -171,6 +172,29 @@ st.markdown(
     """, unsafe_allow_html=True
 )
 
+# Kelas untuk transformasi video dengan streamlit-webrtc
+class VideoTransformer(VideoTransformerBase):
+    def __init__(self):
+        self.threshold = 0.95
+
+    def transform(self, frame):
+        img = frame.to_ndarray(format="bgr24")
+        bbox_x, bbox_y, bbox_w, bbox_h, area = find_largest_contour_bounding_box(img)
+        if bbox_x is not None and area > 5000:
+            cropped_frame = img[bbox_y:bbox_y + bbox_h, bbox_x:bbox_x + bbox_w]
+            result, confidence = process_frame(cropped_frame, self.threshold)
+            if result and (result.lower() in buah or result.lower() in sayuran):
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.6
+                color = (0, 255, 0)
+                thickness = 2
+                text = f"Prediksi: {result} ({confidence*100:.2f}%)"
+                (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+                cv2.rectangle(img, (10, 30), (10 + text_width, 30 - text_height - baseline), color, thickness=cv2.FILLED)
+                cv2.putText(img, text, (10, 30 - baseline), font, font_scale, (0, 0, 0), thickness)
+                cv2.rectangle(img, (bbox_x, bbox_y), (bbox_x + bbox_w, bbox_y + bbox_h), (0, 255, 0), 2)
+        return img
+
 def main():
     option = st.selectbox('Pilih metode input:', ('Unggah Gambar', 'Gunakan Kamera'))
     
@@ -198,37 +222,7 @@ def main():
             visualisasi(image_cv, fourier_image)
     
     elif option == 'Gunakan Kamera':
-        run = st.checkbox('Jalankan')
-        FRAME_WINDOW = st.image([])
-
-        camera = cv2.VideoCapture(0)
-
-        while run:
-            ret, frame = camera.read()
-            if not ret:
-                st.write("Gagal menangkap gambar")
-                break
-
-            bbox_x, bbox_y, bbox_w, bbox_h, area = find_largest_contour_bounding_box(frame)
-            if bbox_x is not None and area > 5000:  # Sesuaikan ambang area sesuai kebutuhan
-                cropped_frame = frame[bbox_y:bbox_y + bbox_h, bbox_x:bbox_x + bbox_w]
-                result, confidence = process_frame(cropped_frame, threshold=0.95)  # Menambah threshold menjadi 0.95
-                if result and result.lower() in buah or result.lower() in sayuran:  
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    font_scale = 0.6
-                    color = (0, 255, 0)
-                    thickness = 2
-                    text = f"Prediksi: {result} ({confidence*100:.2f}%)"
-                    (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
-                    cv2.rectangle(frame, (10, 30), (10 + text_width, 30 - text_height - baseline), color, thickness=cv2.FILLED)
-                    cv2.putText(frame, text, (10, 30 - baseline), font, font_scale, (0, 0, 0), thickness)
-                    
-                    # Gambar kotak pembatas di sekitar objek yang terdeteksi
-                    cv2.rectangle(frame, (bbox_x, bbox_y), (bbox_x + bbox_w, bbox_y + bbox_h), (0, 255, 0), 2)
-
-            FRAME_WINDOW.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-
-        camera.release()
+        webrtc_streamer(key="sample", video_transformer_factory=VideoTransformer)
 
 if __name__ == '__main__':
     main()
