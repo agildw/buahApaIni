@@ -201,7 +201,7 @@ class VideoTransformer(VideoTransformerBase):
         # return img
 
 def main():
-    option = st.selectbox('Pilih metode input:', ('Unggah Gambar', 'Gunakan Kamera'))
+    option = st.selectbox('Pilih metode input:', ('Gunakan Kamera','Unggah Gambar'))
     
     if option == 'Unggah Gambar':
         img_file = st.file_uploader("Pilih Gambar", type=["jpg", "png"])
