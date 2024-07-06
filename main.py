@@ -177,14 +177,14 @@ st.markdown(
 # Kelas untuk transformasi video dengan streamlit-webrtc
 class VideoTransformer(VideoTransformerBase):
     def __init__(self):
-        self.threshold = 0.9
+        self.threshold = 0.95
 
     # def transform(self, frame):
     def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
         bbox_x, bbox_y, bbox_w, bbox_h, area = find_largest_contour_bounding_box(img)
         # print(bbox_x, bbox_y, bbox_w, bbox_h, area)
-        if bbox_x is not None and  area > 3000:
+        if bbox_x is not None and  area > 5000:
             cropped_frame = img[bbox_y:bbox_y + bbox_h, bbox_x:bbox_x + bbox_w]
             result, confidence = process_frame(cropped_frame, self.threshold)
             if result and (result.lower() in buah or result.lower() in sayuran):
